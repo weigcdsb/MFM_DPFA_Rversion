@@ -65,11 +65,12 @@ PG_FFBS <- function(BETA_a,
     Omega_tmp2 <- Omega_tmp[obsIdx,obsIdx,t]
     Yhat_tmp2 <- Yhat_tmp[obsIdx,t]
     
+    
     if(sum(obsIdx) > 0){
       Kt <- V_tt_1 %*% t(X_tmp2) %*%
         solve(X_tmp2 %*% V_tt_1 %*% t(X_tmp2) + solve(Omega_tmp2))
-      m_tmp[,t] <- m_tt_1 + Kt %*% (Yhat_tmp2 - X_tmp2 %*% m_tt_1)
-      V_tmp[,,t] <- (diag(p_tmp) - Kt %*% X_tmp2) %*% V_tt_1
+      m_tmp[,t] <- as.vector(m_tt_1 + Kt %*% (Yhat_tmp2 - X_tmp2 %*% m_tt_1))
+      V_tmp[,,t] <- as.matrix((diag(p_tmp) - Kt %*% X_tmp2) %*% V_tt_1)
       V_tmp[,,t] <- (V_tmp[,,t] + t(V_tmp[,,t]))/2
     }else{
       m_tmp[,t] <- m_tt_1
@@ -89,7 +90,7 @@ PG_FFBS <- function(BETA_a,
     mstar_tmp <- m_tmp[,t] + Jt %*% 
       (BETA_b[,t+1] - A %*% m_tmp[,t] - b)
     Vstar_tmp <- (diag(p_tmp) - Jt %*% A) %*% V_tmp[,,t]
-    Vstar_tmp <- (Vstar_tmp + t(Vstar_tmp))/2
+    Vstar_tmp <- as.matrix((Vstar_tmp + t(Vstar_tmp))/2)
     BETA_b[,t] <- rmvnorm(1, mean = mstar_tmp,
                           sigma = Vstar_tmp)
   }
@@ -110,7 +111,7 @@ update_clusParam_PG <- function(theta_a,
   # C_tmp <- C_fit[idx_tmp,1:p_tmp,g-1] # C_tmp <- numeric(0)
   # Y_tmp <- Y[idx_tmp,]
   # R_tmp <- matrix(10, nrow = sum(idx_tmp), ncol = T_all)
-  
+
   theta_b <- theta_a
   
   N_tmp <- dim(Y_tmp)[1]

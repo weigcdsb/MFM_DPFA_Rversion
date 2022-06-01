@@ -5,14 +5,18 @@ library(pgdraw)
 library(mvtnorm)
 #############################################
 #### load functions
-setwd('D:\\github\\MFM_DPFA_Rversion\\function')
+usr_dir <- 'C:\\Users\\gaw19004\\Documents\\GitHub\\MFM_DPFA_Rversion'
+# usr_dir <- 'D:\\github\\MFM_DPFA_Rversion\\function'
+
+paste0(usr_dir,'\\function')
+setwd(paste0(usr_dir,'\\function'))
 source('sample_prior.R')
 source('update_clusParam_PG.R')
 
 
 #############################################
 #### read data & ground truth
-setwd('D:\\github\\MFM_DPFA_Rversion\\data_gen')
+setwd(paste0(usr_dir,'\\data_gen'))
 
 ## observation
 Y <- as.matrix(read.csv('Y.csv', header = F))
