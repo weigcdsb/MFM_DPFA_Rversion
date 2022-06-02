@@ -44,8 +44,9 @@ PG_FFBS <- function(BETA_a,
   # (1) A, b, Sig, m0, V0
   # (2) Yhat_tmp, X_tmp, w_tmp(precision)
   # output: BETA_b
-  
-  BETA_b <- FFBS(A,b,m0, V0, Sig, Yhat_tmp, X_tmp,
+  BETA_b <- FFBS(as.matrix(A),b,
+                 m0, V0, as.matrix(Sig),
+                 Yhat_tmp, X_tmp,
                w_tmp, T_tmp, p_tmp)
   return(BETA_b)
 }

@@ -6,8 +6,8 @@ library(pgdraw)
 library(mvtnorm)
 #############################################
 #### load functions
-# usr_dir <- 'C:\\Users\\gaw19004\\Documents\\GitHub\\MFM_DPFA_Rversion'
-usr_dir <- 'D:\\github\\MFM_DPFA_Rversion'
+usr_dir <- 'C:\\Users\\gaw19004\\Documents\\GitHub\\MFM_DPFA_Rversion'
+# usr_dir <- 'D:\\github\\MFM_DPFA_Rversion'
 
 setwd(paste0(usr_dir,'\\function'))
 source('sample_prior.R')
@@ -163,6 +163,8 @@ birth_rate <- 1e-3
 birth_time <- 1
 alpha <- 2
 
+p_trace <- matrix(0,nClus, ng)
+
 for(g in 2:ng){
   
   cat(paste("iter = ", g))
@@ -222,7 +224,7 @@ for(g in 2:ng){
                     prior = normal(0, 1),
                     refresh = 0,
                     offset = offset_tmp,
-                    chains = 1, iter = 5,
+                    chains = 1, iter = 3,
                     init = deltC0)
     deltC_samp <- c(tail(as.matrix(fit), 1))
     delta_fit[ii,g] <- deltC_samp[1]
@@ -373,6 +375,14 @@ for(g in 2:ng){
     
   }
   
+  for(ii in 1:nClus){
+    p_trace[ii,g] <- THETA[[g]][[ii]]$p
+  }
+  
+  par(mfcol = c(1,2))
+  hist(p_trace[1,2:g])
+  hist(p_trace[2,2:g])
+  par(mfcol = c(1,1))
 }
 
 
