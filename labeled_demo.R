@@ -1,3 +1,4 @@
+library(Rcpp)
 library(rstanarm)
 # library(bpr)
 library(INLA)
@@ -5,17 +6,89 @@ library(pgdraw)
 library(mvtnorm)
 #############################################
 #### load functions
-usr_dir <- 'C:\\Users\\gaw19004\\Documents\\GitHub\\MFM_DPFA_Rversion'
-# usr_dir <- 'D:\\github\\MFM_DPFA_Rversion\\function'
+# usr_dir <- 'C:\\Users\\gaw19004\\Documents\\GitHub\\MFM_DPFA_Rversion'
+usr_dir <- 'D:\\github\\MFM_DPFA_Rversion'
 
-paste0(usr_dir,'\\function')
 setwd(paste0(usr_dir,'\\function'))
 source('sample_prior.R')
 source('update_clusParam_PG.R')
 
+## make stand-alone Rcpp function later...
+cppFunction('arma::mat FFBS(arma::mat A,
+              arma::vec b,
+              arma::vec m0,
+              arma::mat V0,
+              arma::mat Sig,
+              arma::mat Yhat_tmp,
+              arma::mat X_tmp,
+              arma::mat w_tmp,
+              int T,
+              int p){
+              
+              arma::vec Tvec = arma::linspace(0, T-1, T);
+              arma::mat m_tmp(p,T);
+              arma::cube V_tmp(p,p,T);
+              
+              // return
+              arma::mat BETA_b(p,T);
+              
+              
+              arma::mat Kt;
+              arma::mat m_tt_1;
+              arma::mat V_tt_1;
+              
+              // (1) FF: forward-sampling
+              for(int t = 0; t < T; ++t){
+              
+                // prediction
+                if(t == 0){
+                  m_tt_1 = A*m0 + b;
+                  V_tt_1 = A*V0*A.t() + Sig;
+                }else{
+                  m_tt_1 = A*m_tmp.col(t-1) + b;
+                  V_tt_1 = A*V_tmp.slice(t-1)*A.t() + Sig;
+                }
+              
+                arma::uvec idx = arma::find_finite(Yhat_tmp.col(t));
+                arma::mat X_tmp2 = X_tmp.rows(idx);
+                arma::vec w_tmp2 = w_tmp.submat(idx,find(Tvec == t));
+                arma::mat Yhat_tmp2 = Yhat_tmp.submat(idx,find(Tvec == t));
+              
+                // filtering
+                Kt = V_tt_1 * X_tmp2.t()*
+                  inv(X_tmp2 * V_tt_1 *X_tmp2.t() + diagmat(1/w_tmp2));
+                m_tmp.col(t) = m_tt_1 + Kt*(Yhat_tmp2 - X_tmp2*m_tt_1);
+                V_tmp.slice(t) = (arma::eye(p,p) - Kt*X_tmp2)*V_tt_1;
+                V_tmp.slice(t) = (V_tmp.slice(t) + V_tmp.slice(t).t())/2;
+              }
+              
+              // (2) BS: backward sampling
+              BETA_b.col(T-1) = mvrnormArma(1,
+              m_tmp.col(T-1),V_tmp.slice(T-1));
+              
+              for(int t = T-2; t >= 0; t--){
+              
+              arma::mat Jt = V_tmp.slice(t) *A.t()*
+              inv(A*V_tmp.slice(t)*A.t() + Sig);
+              arma::vec mstar_tmp = m_tmp.col(t) + 
+              Jt*(BETA_b.col(t+1) - A*m_tmp.col(t) - b);
+              arma::mat Vstar_tmp = (arma::eye(p,p) - Jt*A)*V_tmp.slice(t);
+              Vstar_tmp = (Vstar_tmp + Vstar_tmp.t())/2;
+              BETA_b.col(t) = mvrnormArma(1,mstar_tmp,Vstar_tmp);
+              }
+              
+              
+              return BETA_b;
+              }',depends="RcppArmadillo",
+            includes = 'arma::mat mvrnormArma(int n, arma::vec mu, arma::mat sigma) {
+   int ncols = sigma.n_cols;
+   arma::mat Y = arma::randn(n, ncols);
+   return arma::trans(arma::repmat(mu, 1, n).t() + Y * arma::chol(sigma));
+}')
+
 
 #############################################
-#### read data & ground truth
+# #### read data & ground truth
 setwd(paste0(usr_dir,'\\data_gen'))
 
 ## observation
@@ -62,7 +135,7 @@ delta_fit[,1] <- rnorm(N)
 for(kk in 1:nClus){
   idx_tmp <- (lab == kk)
   N_tmp <- sum(idx_tmp)
-  p_tmp <- 2 # 1
+  p_tmp <- 1 # 1
   
   prior$x0 <- rep(0,p_tmp)
   prior$Q0 <- diag(p_tmp)
@@ -286,7 +359,7 @@ for(g in 2:ng){
         THETA[[g]][[j]]$b <- THETA[[g]][[j]]$b[!del_col_expand]
         THETA[[g]][[j]]$A <- THETA[[g]][[j]]$A[!del_col_expand,!del_col_expand]
         THETA[[g]][[j]]$Q <- THETA[[g]][[j]]$Q[!del_col_expand,!del_col_expand]
-        THETA[[g]][[j]]$X <- THETA[[g]][[j]]$X[!del_col,]
+        THETA[[g]][[j]]$X <- matrix(THETA[[g]][[j]]$X[!del_col,], ncol = T_all)
         
         C_tmp <- 0*C_fit[obsIdx,,g]
         if(p_tmp > 1){

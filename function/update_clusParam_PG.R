@@ -33,67 +33,20 @@ PG_FFBS <- function(BETA_a,
   
   w_tmp <- matrix(w_tmp_raw, nrow = N_tmp)
   
-  Omega_tmp <- array(0,dim = c(N_tmp, N_tmp, T_tmp))
-  Yhat_tmp <- matrix(0, nrow = N_tmp, ncol = T_tmp)
-  
-  for(t in 1:T_tmp){
-    # (b) calculate \Omega_t
-    Omega_tmp[,,t] <- diag(w_tmp[,t])
-    
-    # (c) calculate yhat_t
-    kt_tmp <- (Y_tmp[,t] - R_tmp[,t])/2 +
-      w_tmp[,t]*(log(R_tmp[,t]) - delta_tmp)
-    Yhat_tmp[,t] <- (1/w_tmp[,t])*kt_tmp
-  }
+  k_tmp <- (Y_tmp - R_tmp)/2 + w_tmp*
+    (log(R_tmp) - delta_tmp %x% t(rep(1,T_tmp)))
+  Yhat_tmp <- (1/w_tmp)*k_tmp
   
   ## (2) FF: forward filtering-- calculate m_t, V_t
-  m_tmp <- matrix(0, nrow = p_tmp, ncol = T_tmp)
-  V_tmp <- array(0, dim = c(p_tmp, p_tmp, T_tmp))
   
-  for(t in 1:T_tmp){
-    
-    if(t == 1){
-      m_tt_1 <- A %*% m0 + b
-      V_tt_1 <- A %*% V0 %*% t(A) + Sig
-    }else{
-      m_tt_1 <-  A %*% m_tmp[,t-1] + b
-      V_tt_1 <- A %*% V_tmp[,,t-1]%*% t(A) + Sig
-    }
-    
-    obsIdx <- !is.na(Yhat_tmp[,t])
-    X_tmp2 <- X_tmp[obsIdx,]
-    Omega_tmp2 <- Omega_tmp[obsIdx,obsIdx,t]
-    Yhat_tmp2 <- Yhat_tmp[obsIdx,t]
-    
-    
-    if(sum(obsIdx) > 0){
-      Kt <- V_tt_1 %*% t(X_tmp2) %*%
-        solve(X_tmp2 %*% V_tt_1 %*% t(X_tmp2) + solve(Omega_tmp2))
-      m_tmp[,t] <- as.vector(m_tt_1 + Kt %*% (Yhat_tmp2 - X_tmp2 %*% m_tt_1))
-      V_tmp[,,t] <- as.matrix((diag(p_tmp) - Kt %*% X_tmp2) %*% V_tt_1)
-      V_tmp[,,t] <- (V_tmp[,,t] + t(V_tmp[,,t]))/2
-    }else{
-      m_tmp[,t] <- m_tt_1
-      V_tmp[,,t] <- V_tt_1
-    }
-    
-  }
   
-  ## (3) BS: backward sampling
-  BETA_b[,T_tmp] <- rmvnorm(1, mean = m_tmp[,T_tmp],
-                            sigma = as.matrix(V_tmp[,,T_tmp]))
+  # input: 
+  # (1) A, b, Sig, m0, V0
+  # (2) Yhat_tmp, X_tmp, w_tmp(precision)
+  # output: BETA_b
   
-  for(t in (T_tmp-1):1){
-    # print(t)
-    Jt <- V_tmp[,,t] %*% t(A) %*%
-      solve(t(A) %*% V_tmp[,,t] %*% t(A) + Sig)
-    mstar_tmp <- m_tmp[,t] + Jt %*% 
-      (BETA_b[,t+1] - A %*% m_tmp[,t] - b)
-    Vstar_tmp <- (diag(p_tmp) - Jt %*% A) %*% V_tmp[,,t]
-    Vstar_tmp <- as.matrix((Vstar_tmp + t(Vstar_tmp))/2)
-    BETA_b[,t] <- rmvnorm(1, mean = mstar_tmp,
-                          sigma = Vstar_tmp)
-  }
+  BETA_b <- FFBS(A,b,m0, V0, Sig, Yhat_tmp, X_tmp,
+               w_tmp, T_tmp, p_tmp)
   return(BETA_b)
 }
 
